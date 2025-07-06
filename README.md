@@ -1,5 +1,5 @@
 # 🔗 Notice Regarding Website Access During System Upgrade
-👉 Due to the ongoing service system upgrade at our university, our website will only be accessible from 8:00 AM to 6:00 PM (Beijing Time). Outside these hours, access will be restricted to on-campus networks only.
+👉 Due to the ongoing service system upgrade at our university, our website will only be accessible from 8:00 AM to 8:00 PM (Beijing Time). Outside these hours, access will be restricted to on-campus networks only.
 
 We apologize for any inconvenience this may cause. If you require large-scale computational tasks, please refer to the following instructions for localized processing.
 ---
@@ -35,15 +35,6 @@ pip install -i https://pypi.tuna.tsinghua.edu.cn/simple xgboost
 pip install dgllife==0.2.8
 pip install rdkit-pypi
 pip install dgl==1.1.2+cu117 -f https://data.dgl.ai/wheels/cu117/repo.html
-```
-
-### 🔧 DGL Compatibility Fix
-
-If you encounter errors in DGL's model zoo (especially in `attentivefp.py`):
-
-* Replace `fn.copy_edge` with `fn.copy_e`
-* Replace `fn.src_mul_edge` with `fn.u_mul_e`
-
 ---
 
 ## 🚀 How to Use NIRFluor-opt

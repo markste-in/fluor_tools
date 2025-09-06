@@ -1,15 +1,10 @@
-# 🔗 Notice Regarding Website Access During System Upgrade
-👉 Due to the ongoing service system upgrade at our university, our website will only be accessible from 8:00 AM to 8:00 PM (Beijing Time). Outside these hours, access will be restricted to on-campus networks only.
-
-We apologize for any inconvenience this may cause. If you require large-scale computational tasks, please refer to the following instructions for localized processing.
----
 # Fluor-tools
 
 **Fluor-tools** is an integrated web-based and local computational platform for dye structure optimization and property prediction. It includes two core modules:
 
-* **NIRFluor-opt**: Converts non-NIR dyes to NIR dyes using a rule-based strategy.
-* **Fluor-RLAT**: Predicts photophysical properties of dyes using a multimodal deep learning model.
-
+* **Fluor-pred**: Predicts photophysical properties of dyes using a multimodal deep learning model.
+* **Fluor-opt**: Converts non-NIR dyes to NIR dyes using a rule-based strategy.
+* Note: The two modules in this work have been renamed, where NIRFluor-opt = Fluor-opt and Fluor-RLAT = Fluor-pred.
 ---
 
 ## 🔗 Online Usage
@@ -37,7 +32,7 @@ pip install rdkit-pypi
 pip install dgl==1.1.2+cu117 -f https://data.dgl.ai/wheels/cu117/repo.html
 ---
 
-## 🚀 How to Use NIRFluor-opt
+## 🚀 How to Use Fluor-opt
 
 ```bash
 cd NIRFluor-opt and web
@@ -64,7 +59,7 @@ python run.py
 ## 🔮 How to Use Fluor-RLAT
 
 ```bash
-cd Fluor-RLAT
+cd Fluor-pred
 ```
 
 1. Customize `run.py` with your molecules and solvent information
@@ -94,3 +89,5 @@ For issues or inquiries, please open an [Issue] or contact the developers via th
 ---
 
 Enjoy using **Fluor-tools** for intelligent dye discovery! 🌈
+
+

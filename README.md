@@ -82,6 +82,11 @@ python run.py
 ![image](https://github.com/wenxiang-Song/fluor_tools/blob/main/Figure1.png?raw=true)
 ---
 
+## 🔗 Plotting code
+
+👉 The core plotting code and data for this work can be found in the figure_code folder.
+
+
 ## 📬 Contact
 
 For issues or inquiries, please open an [Issue] or contact the developers via the project homepage.

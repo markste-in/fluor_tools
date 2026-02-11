@@ -11,26 +11,26 @@ app.config['RESULT_FOLDER'] = './results'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['RESULT_FOLDER'], exist_ok=True)
 
-# Home 页面
+# Home page
 @app.route('/')
 def home():
     return render_template('home.html')
 
-# Optimization 页面
+# Optimization page
 @app.route('/index')
 def optimization():
     return render_template('index.html')
 
-# Prediction 页面
+# Prediction page
 @app.route('/prediction', methods=['GET', 'POST'])
 def predict():
-    print("📥 正在进入 /prediction 路由处理")
+    print("📥 Entering /prediction route handler")
     if request.method == 'POST':
         try:
             new_smiles = request.form['smiles']
             new_solvent_name = request.form['solvent']
 
-            # 溶剂映射
+            # Solvent mapping
             solvent_mapping = {
                 'CH2Cl2': 'ClCCl',
                 'MeOH': 'CO',
@@ -45,7 +45,7 @@ def predict():
             }
 
             if new_solvent_name not in solvent_mapping:
-                return render_template('prediction.html', error='溶剂名不在支持列表中')
+                return render_template('prediction.html', error='Solvent name not in supported list')
 
             new_solvent = solvent_mapping[new_solvent_name]
 
@@ -54,9 +54,9 @@ def predict():
             df.at[0, 'solvent'] = new_solvent
             df.to_csv('./predict/input/target.csv', index=False)
 
-            subprocess.run(['python', './predict/01_数据预处理.py'], check=True)
-            subprocess.run(['python', './predict/02_性质预测.py'], check=True)
-            subprocess.run(['python', './predict/03_文件组合.py'], check=True)
+            subprocess.run(['python', './predict/01_data_preprocessing.py'], check=True)
+            subprocess.run(['python', './predict/02_property_prediction.py'], check=True)
+            subprocess.run(['python', './predict/03_file_merge.py'], check=True)
 
             result_df = pd.read_csv('./predict/result/target_predictions.csv')
             result_df.columns = ['Absorption (nm)', 'Emission (nm)', 'Quantum Yield', 'Molar Abs. Coef.']
@@ -69,12 +69,12 @@ def predict():
 
     return render_template('prediction.html')
 
-# About 页面
+# About page
 @app.route('/about')
 def about():
     return render_template('about.html')
 
-# 模型运行逻辑
+# Model execution logic
 @app.route('/run_model', methods=['POST'])
 def run_model():
     smiles = request.form['smiles']
@@ -88,7 +88,7 @@ def run_model():
     try:
         processing.process(similarity_value)
 
-        # 提取前10个 predicted_label==1 的 smiles
+        # Extract top 20 smiles with predicted_label==1
         result_file = os.path.join(app.config['RESULT_FOLDER'], 'new_molecules.csv')
         smiles_list = []
         if os.path.exists(result_file):
@@ -99,18 +99,18 @@ def run_model():
 
     except RuntimeError as e:
         error_msg = str(e)
-        if "无法拆分" in error_msg:
+        if "Cannot fragment" in error_msg:
             return render_template('index.html', success=False, error="The molecular structure is too homogeneous to be effectively separated.")
-        elif "没有找到匹配的规则" in error_msg:
+        elif "No matching rules" in error_msg:
             return render_template('index.html', success=False, error="No matching rules were found. Please lower the Similarity Value.")
         else:
             return render_template('index.html', success=False, error="Runtime error occurred.")
 
     except Exception as e:
-        print(f"处理失败: {e}")
+        print(f"Processing failed: {e}")
         return render_template('index.html', success=False, error="Model runtime failure: Input validation required.")
 
-# 文件下载
+# File download
 @app.route('/download/<filename>')
 def download_file(filename):
     return send_file(

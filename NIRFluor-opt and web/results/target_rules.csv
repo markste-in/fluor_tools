@@ -3641,6 +3641,12 @@ CC[*:3] --->>>--- CCCCCCCCOc1cc(C=C[*:3])c(OCCCCCCCC)cc1C=O,CC[*:3],CCCCCCCCOc1c
 CC[*:1] --->>>--- CCCCCCCCC1(CCCCCCCC)c2ccccc2-c2ccc(C=C[*:1])cc21,CC[*:1],CCCCCCCCC1(CCCCCCCC)c2ccccc2-c2ccc(C=C[*:1])cc21
 CC[*:2] --->>>--- CCCCCCCCC1(CCCCCCCC)c2ccccc2-c2ccc(C=C[*:2])cc21,CC[*:2],CCCCCCCCC1(CCCCCCCC)c2ccccc2-c2ccc(C=C[*:2])cc21
 CC[*:3] --->>>--- CCCCCCCCC1(CCCCCCCC)c2ccccc2-c2ccc(C=C[*:3])cc21,CC[*:3],CCCCCCCCC1(CCCCCCCC)c2ccccc2-c2ccc(C=C[*:3])cc21
+CC(C)[Si](C(C)C)(C(C)C)[*:1] --->>>--- c1ccc([*:1])cc1,CC(C)[Si](C(C)C)(C(C)C)[*:1],c1ccc([*:1])cc1
+CC(C)[Si](C(C)C)(C(C)C)[*:2] --->>>--- c1ccc([*:2])cc1,CC(C)[Si](C(C)C)(C(C)C)[*:2],c1ccc([*:2])cc1
+CC(C)[Si](C(C)C)(C(C)C)[*:3] --->>>--- c1ccc([*:3])cc1,CC(C)[Si](C(C)C)(C(C)C)[*:3],c1ccc([*:3])cc1
+CC(C)[Si](C#C[*:1])(C(C)C)C(C)C --->>>--- C(#C[*:1])c1ccccc1,CC(C)[Si](C#C[*:1])(C(C)C)C(C)C,C(#C[*:1])c1ccccc1
+CC(C)[Si](C#C[*:2])(C(C)C)C(C)C --->>>--- C(#C[*:2])c1ccccc1,CC(C)[Si](C#C[*:2])(C(C)C)C(C)C,C(#C[*:2])c1ccccc1
+CC(C)[Si](C#C[*:3])(C(C)C)C(C)C --->>>--- C(#C[*:3])c1ccccc1,CC(C)[Si](C#C[*:3])(C(C)C)C(C)C,C(#C[*:3])c1ccccc1
 CC(C)(c1ccc(N(c2ccc(C(C)(C)[*:1])cc2)[*:1])cc1)[*:1] --->>>--- CC(C)(c1cc(C(C)(C)[*:1])cc([*:1])c1)[*:1],CC(C)(c1ccc(N(c2ccc(C(C)(C)[*:1])cc2)[*:1])cc1)[*:1],CC(C)(c1cc(C(C)(C)[*:1])cc([*:1])c1)[*:1]
 CC(C)(c1ccc(N(c2ccc(C(C)(C)[*:2])cc2)[*:2])cc1)[*:2] --->>>--- CC(C)(c1cc(C(C)(C)[*:2])cc([*:2])c1)[*:2],CC(C)(c1ccc(N(c2ccc(C(C)(C)[*:2])cc2)[*:2])cc1)[*:2],CC(C)(c1cc(C(C)(C)[*:2])cc([*:2])c1)[*:2]
 CC(C)(c1ccc(N(c2ccc(C(C)(C)[*:3])cc2)[*:3])cc1)[*:3] --->>>--- CC(C)(c1cc(C(C)(C)[*:3])cc([*:3])c1)[*:3],CC(C)(c1ccc(N(c2ccc(C(C)(C)[*:3])cc2)[*:3])cc1)[*:3],CC(C)(c1cc(C(C)(C)[*:3])cc([*:3])c1)[*:3]
@@ -3689,6 +3695,12 @@ CC(C)(C)c1cc(C(C)(C)C)cc([*:3])c1 --->>>--- C#Cc1ccc([*:3])cc1,CC(C)(C)c1cc(C(C)
 CC(C)(C)c1cc(C(C)(C)C)cc([*:1])c1 --->>>--- Brc1ccc([*:1])cc1,CC(C)(C)c1cc(C(C)(C)C)cc([*:1])c1,Brc1ccc([*:1])cc1
 CC(C)(C)c1cc(C(C)(C)C)cc([*:2])c1 --->>>--- Brc1ccc([*:2])cc1,CC(C)(C)c1cc(C(C)(C)C)cc([*:2])c1,Brc1ccc([*:2])cc1
 CC(C)(C)c1cc(C(C)(C)C)cc([*:3])c1 --->>>--- Brc1ccc([*:3])cc1,CC(C)(C)c1cc(C(C)(C)C)cc([*:3])c1,Brc1ccc([*:3])cc1
+CC(C)(C)C#C[*:1] --->>>--- C(#C[*:1])c1ccccc1,CC(C)(C)C#C[*:1],C(#C[*:1])c1ccccc1
+CC(C)(C)C#C[*:2] --->>>--- C(#C[*:2])c1ccccc1,CC(C)(C)C#C[*:2],C(#C[*:2])c1ccccc1
+CC(C)(C)C#C[*:3] --->>>--- C(#C[*:3])c1ccccc1,CC(C)(C)C#C[*:3],C(#C[*:3])c1ccccc1
+CC(C)(C)[*:1] --->>>--- c1ccc([*:1])cc1,CC(C)(C)[*:1],c1ccc([*:1])cc1
+CC(C)(C)[*:2] --->>>--- c1ccc([*:2])cc1,CC(C)(C)[*:2],c1ccc([*:2])cc1
+CC(C)(C)[*:3] --->>>--- c1ccc([*:3])cc1,CC(C)(C)[*:3],c1ccc([*:3])cc1
 CC(=O)Oc1ccc([*:1])cc1 --->>>--- CN(C)c1ccc(-c2ccc([*:1])s2)cc1,CC(=O)Oc1ccc([*:1])cc1,CN(C)c1ccc(-c2ccc([*:1])s2)cc1
 CC(=O)Oc1ccc([*:2])cc1 --->>>--- CN(C)c1ccc(-c2ccc([*:2])s2)cc1,CC(=O)Oc1ccc([*:2])cc1,CN(C)c1ccc(-c2ccc([*:2])s2)cc1
 CC(=O)Oc1ccc([*:3])cc1 --->>>--- CN(C)c1ccc(-c2ccc([*:3])s2)cc1,CC(=O)Oc1ccc([*:3])cc1,CN(C)c1ccc(-c2ccc([*:3])s2)cc1

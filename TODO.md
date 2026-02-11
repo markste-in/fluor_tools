@@ -1,0 +1,2 @@
+- conda install -c conda-forge scikit-learn=1.0.2, LightGM, xgboost  Requirements merged with other repo
+- flake req in repo

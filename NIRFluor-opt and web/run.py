@@ -1,17 +1,27 @@
-# from processing import process
-# import pandas as pd
+import os
+from pathlib import Path
+import pandas as pd
+from processing import process
 
-# smiles = "CCN(CC)C1=CC=C(C(C2=CC=CC=C2C(O)=O)=C(C(O3)=C/4)C=CC4=[N+](CC)\CC)C3=C1"
+# Always resolve paths from this file to avoid cwd surprises (e.g., debug adapters).
+BASE_DIR = Path(__file__).resolve().parent
+os.chdir(BASE_DIR)
+INPUT_DIR = BASE_DIR / "input"
+RESULTS_DIR = BASE_DIR / "results"
+INPUT_DIR.mkdir(exist_ok=True)
+RESULTS_DIR.mkdir(exist_ok=True)
 
-# df = pd.DataFrame({"smiles": [smiles]})
-# df.to_csv("./input/target_m.csv", index=False)
+smiles = "C2=C1C7=C(C(=[N+]1[B-]([N]3C2=C5C(=C3C4=CC=CC=C4)C=CC=C5)(F)F)C6=CC=CC=C6)C=CC=C7"
 
-# def main():
-#     # 设置超参数
-#     similarity_value = 0.1
-#     process(similarity_value)
+df = pd.DataFrame({"smiles": [smiles]})
+df.to_csv(INPUT_DIR / "target_m.csv", index=False)
+
+def main():
+    # Set hyperparameters
+    similarity_value = 0.1
+    process(similarity_value)
     
-#     print("\n所有分子处理完成！")
+    print("\nAll molecules processed!")
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()

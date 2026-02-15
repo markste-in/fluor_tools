@@ -5,6 +5,7 @@
 * **Fluor-pred**: Predicts photophysical properties of dyes using a multimodal deep learning model.
 * **Fluor-opt**: Converts non-NIR dyes to NIR dyes using a rule-based strategy.
 * Note: The two modules in this work have been renamed, where NIRFluor-opt = Fluor-opt and Fluor-RLAT = Fluor-pred.
+
 ---
 
 ## 🔗 Online Usage
@@ -45,14 +46,13 @@ cd NIRFluor-opt and web
 python run.py
 ```
 
-3. Optimized NIR dye molecules will be saved to:
+1. Optimized NIR dye molecules will be saved to:
 
 ```bash
 ./results/merged_file_pred.csv
 ```
 
 > ⚠️ Extracting transformation rules from scratch using MMP may take up to one week.
-
 
 ---
 
@@ -69,7 +69,7 @@ cd Fluor-pred
 python run.py
 ```
 
-3. Prediction results will be saved to:
+1. Prediction results will be saved to:
 
 ```bash
 ./result/target_predictions.csv
@@ -86,7 +86,6 @@ python run.py
 
 👉 The core plotting code and data for this work can be found in the figure_code folder.
 
-
 ## 📬 Contact
 
 For issues or inquiries, please open an [Issue] or contact the developers via the project homepage.
@@ -94,5 +93,3 @@ For issues or inquiries, please open an [Issue] or contact the developers via th
 ---
 
 Enjoy using **Fluor-tools** for intelligent dye discovery! 🌈
-
-

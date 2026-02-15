@@ -39,6 +39,7 @@ PATIENCE = 20                          # Early stopping patience
 ## Output
 
 Trained models are saved to `./models/`:
+
 - `Model_abs.pth` - Absorption wavelength
 - `Model_em.pth` - Emission wavelength  
 - `Model_plqy.pth` - Quantum yield
@@ -47,11 +48,13 @@ Trained models are saved to `./models/`:
 ## Colab Environment Notes
 
 The notebook automatically handles:
+
 - DGL installation with correct CUDA version
 - GPU memory management between models
 - Progress bars optimized for Colab display
 
 **Tested with:**
+
 - Colab T4 GPU runtime
 - PyTorch 2.x + CUDA 12.x
 - DGL 2.x
@@ -59,13 +62,16 @@ The notebook automatically handles:
 ## Troubleshooting
 
 ### "CUDA out of memory"
+
 - Restart runtime and try training one model at a time
 - Reduce `BATCH_SIZE` from 32 to 16
 
 ### DGL installation fails
+
 - Try: `!pip install dgl -f https://data.dgl.ai/wheels/cu121/repo.html`
 - Check PyTorch CUDA version matches DGL wheel
 
 ### Slow graph conversion
+
 - This is normal (~5 min for 22k molecules on first run)
 - Subsequent runs use cached graphs

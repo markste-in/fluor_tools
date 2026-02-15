@@ -1,20 +1,24 @@
 # Chinese to English Filename Translation Map
 
 ## Python Scripts
+
 - `01_数据预处理.py` → `01_data_preprocessing.py` (Data Preprocessing)
 - `02_性质预测.py` → `02_property_prediction.py` (Property Prediction)
 - `03_文件组合.py` → `03_file_merge.py` (File Merge/Combination)
 
 ## CSV Files in results/
+
 - `基团替换.csv` → `group_substitution.csv` (Group Substitution)
 - `H替换.csv` → `h_substitution.csv` (H Substitution)
 
 ## CSV Files in data/
+
 - `转换规则.csv` → `transformation_rules.csv` (Transformation Rules)
 - `转换规则_MACCS.csv` → `transformation_rules_maccs.csv` (Transformation Rules MACCS)
 - `转换规则_Morgan.csv` → `transformation_rules_morgan.csv` (Transformation Rules Morgan)
 
 ## Common Chinese Terms in Code
+
 - `设置超参数` → "Set hyperparameters"
 - `所有分子处理完成` → "All molecules processed"
 - `已删除` → "Deleted"
@@ -70,4 +74,5 @@
 - `请确认已安装...依赖并重试` → "Please confirm...dependencies are installed and retry"
 
 ## Notebook Chinese Content (figure_code/)
+
 Most are plot labels and comments in Chinese - these can remain as-is for now since they're in the figure code folder which is not part of runtime.

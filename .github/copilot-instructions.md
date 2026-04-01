@@ -5,10 +5,26 @@
 ### Fluor-RLAT (Property Prediction - Standalone)
 Predicts absorption, emission, quantum yield, and molar absorptivity.
 - **Entry**: `Fluor-RLAT/run.py`
+- **Inference**: `Fluor-RLAT/02_property_prediction.py` (loads pretrained models, runs forward pass)
 - **Models**: `Model_abs.pth`, `Model_em.pth`, `Model_k.pth`, `Model_plqy.pth`
 - **Data**: `Fluor-RLAT/data/*`, `Fluor-RLAT/input/*`
 - **Outputs**: `Fluor-RLAT/result/target_predictions*.csv`
 - **Scripts**: `01_data_preprocessing.py`, `02_property_prediction.py`, `03_file_merge.py` (preprocessing → inference → merge/cleanup)
+- **Training Notebook**: `colab_training/Fluor_RLAT_Training.ipynb` (GPU-accelerated training with checkpointing)
+- **Prediction Notebook**: `colab_training/Fluor_RLAT_Predict.ipynb` (lightweight inference-only notebook)
+
+### Google Colab Paths (Google Drive)
+When running notebooks in Google Colab, files are stored on Google Drive:
+- **Trained Models**: `/content/drive/MyDrive/fluor_models/` (Model_abs.pth, Model_em.pth, etc.)
+- **Checkpoints**: `/content/drive/MyDrive/fluor_checkpoints/` (checkpoint_abs.pth, etc. with training state)
+- **Merged Training Data**: `/content/drive/MyDrive/fluor_models/merged_training_data/` (expanded/cleaned datasets; auto-detected by training notebook)
+- **Pretrained Models**: `./fluor_tools/Fluor-RLAT/` (cloned from repo)
+
+### Training Data Priority
+The training notebook (`Fluor_RLAT_Training.ipynb`) automatically checks for newer training data:
+1. **First choice**: `/content/drive/MyDrive/fluor_models/merged_training_data/` — if this directory exists and contains train files, they are **copied into the cloned repo's data folder**, replacing the originals. The repo is temporary (cloned fresh each session), so overwriting is safe.
+2. **Fallback**: `./fluor_tools/Fluor-RLAT/data` — original repository data used as-is when no merged data exists on Drive.
+This allows retraining with expanded or cleaned datasets by simply uploading new files to the Google Drive `merged_training_data` folder. The `Create_Training_Data.ipynb` notebook's deploy cell (Cell 25) copies merged files there with standard `train_*.csv` naming.
 
 ### NIRFluor-opt and web (⚠️ Contains BOTH modules)
 
@@ -31,229 +47,575 @@ Plotting notebooks and source data for manuscript figures; not part of runtime.
 
 ## Why Two Modules
 - NIRFluor-opt targets structure generation/optimization: starting from a supplied SMILES, it fragments the molecule, selects transformation rules by MACCS similarity, applies substitutions, and surfaces candidate near-infrared dyes (predicted_label==1) for user review. It is rule-based and focuses on proposing new molecules.
-- Fluor-RLAT (a.k.a. Fluor-pred) handles property prediction: given SMILES and solvent, it computes descriptors/fingerprints, runs pretrained AttentiveFP + CNN models, and outputs four photophysical properties. It does not generate structures—only evaluates them.
+- Fluor-RLAT (a.k.a. Fluor-pred) handles property prediction: given SMILES and solvent, it computes descriptors/fingerprints, runs pretrained AttentiveFP + fingerprint models, and outputs four photophysical properties. It does not generate structures—only evaluates them.
 - Together: run NIRFluor-opt to generate candidate NIR dyes, then run Fluor-RLAT (or predict/) to score their absorption/emission/yield/extinction; the web app wires these flows for interactive use.
 
 ## Naming Note
 - Fluor-opt was renamed to NIRFluor-opt; Fluor-pred was renamed to Fluor-RLAT. Code and docs may use either pair interchangeably.
 - Confusing folder structure: "NIRFluor-opt and web/" contains BOTH the NIRFluor-opt pipeline (at root) AND a copy of Fluor-RLAT (in predict/ subfolder). Running predict/run.py executes Fluor-RLAT property prediction, NOT NIRFluor-opt structure generation.
 
-## High-Level Data Flow
-- Property prediction (Fluor-RLAT and predict/):
-  1) 01_data_preprocessing.py maps solvent names to numeric ids, computes RDKit descriptors, scaffold tags, and writes input/input.csv plus derived fingerprints (target_smiles_morgan.csv, target_sol_morgan.csv).
-  2) 02_property_prediction.py loads pretrained graph+fingerprint models (AttentiveFP with CNN over fingerprints) for abs/em/plqy/k. It standardizes numeric features, runs inference, and saves per-target CSVs under result/.
-  3) 03_file_merge.py concatenates the four prediction CSVs into result/target_predictions.csv and deletes .bin cache files.
-- NIR optimization (processing.py):
-  1) Cleans previous results (results/*.csv, results/molecule_images/*.png, results/rules_images/*.png).
-  2) Reads input/target_m.csv, fragments the SMILES via rdMMPA across cut counts (1-3), saves fragments to results/target_fragment.csv; aborts if molecule cannot be fragmented.
-  3) Computes MACCS for target, filters transformation rules from data/transformation_rules_maccs.csv by Tanimoto similarity > user-supplied similarity_value; writes results/target_similary_rules.csv, expands to results/target_rules.csv (and target_rules_replace.csv when H replacements appear).
-  4) Applies mapped node replacements to fragment combinations to generate candidate motifs; outputs results/new_m_replace.csv plus used_mapping_pairs.csv.
-  5) Post-processes new_m_replace.csv (column reassignment by marker [*:1-3], pruning sparse rows, filling missing substitutions) then saves candidate molecules.
-  6) Merges generated fragments with rule mappings (using data/transformation_rules.csv and other rule sources) to build results/new_molecules.csv, results/merged_file.csv, results/merged_file_pred.csv, etc.; selects predicted_label==1 rows for UI display. Images for molecules and rules are drawn to results/molecule_images and results/rules_images.
-- Flask app (app.py):
-  - Route /run_model accepts SMILES + Similarity Value, writes input/target_m.csv, calls processing.process(similarity_value), then surfaces up to 20 passing SMILES (predicted_label==1) from results/new_molecules.csv.
-  - Route /prediction rewrites predict/input/target.csv with SMILES + solvent, runs predict/01..03 to produce predict/result/target_predictions.csv, and renders the table.
+---
 
-## File Responsibilities and Entry Points
-- Fluor-RLAT/run.py: sample driver that sets similarity_value=0.1 and calls processing.process for an example SMILES; adjust or import as needed for batch runs.
-- Fluor-RLAT/01_data_preprocessing.py: multi-step feature generation; heavy scaffold list inside; ensure RDKit available.
-- Fluor-RLAT/02_property_prediction.py: defines GraphFingerprintsModel and fingerprint CNN; loads .pth weights; assumes StandardScaler/MinMaxScaler fit to training data; device auto-selects CUDA if available.
-- Fluor-RLAT/03_file_merge.py: merges prediction outputs and removes *.bin caches.
-- NIRFluor-opt and web/app.py: Flask UI; uses templates under templates/ and static assets under static/.
-- NIRFluor-opt and web/processing.py: entire optimization pipeline described above; controls rule filtering and molecule assembly. Relies on data/transformation_rules*.csv and results/ staging.
-- NIRFluor-opt and web/run.py: simple CLI wrapper that seeds input/target_m.csv and calls processing.process with similarity_value=0.1.
-- predict/ within NIRFluor-opt and web: copy of Fluor-RLAT pipeline for single-target prediction used by the web route.
-- figure_code/*: notebooks (Fluor-opt_figures_code.ipynb, Fluor-pred_figures_code.ipynb) with associated CSV data for plotting figures.
+## ⚠️ CRITICAL: Two Different Model Architectures
 
-## Data Locations and Persistence
-- Inputs: Fluor-RLAT/input/target.csv (property prediction), NIRFluor-opt and web/input/target_m.csv (optimization), predict/input/target.csv (web prediction). Training/reference rule tables under NIRFluor-opt and web/data/* and Fluor-RLAT/data/*.
-- Outputs: Fluor-RLAT/result/target_predictions*.csv; NIRFluor-opt and web/results/*.csv plus images; predict/result/target_predictions.csv for UI.
-- Scripts aggressively delete previous outputs (processing.py removes prior results CSV/PNG; 03_文件组合.py removes .bin caches). Preserve artifacts elsewhere if needed.
+**The four Fluor-RLAT models use TWO DIFFERENT architectures. This is the most common source of bugs.**
+
+### Architecture 1: GraphFingerprintsModel (for abs and em)
+Uses CNN attention for fingerprints + separate solvent extractor.
+
+**Layer structure (verified from state_dict):**
+```
+fp_extractor.conv_feat: Conv1d(1, 256, kernel_size=3)
+fp_extractor.conv_attn: Conv1d(1, 256, kernel_size=3)
+solvent_extractor.0: Linear(1024, 256)
+solvent_extractor.3: Linear(256, 256)
+predict.1: Linear(1024, 128)  ← input is 1024!
+predict.3: Linear(128, 1)
+```
+
+**Fingerprint processing:**
+- Splits input: `solvent_feat = fp[:, :1024]`, `smiles_extra_feat = fp[:, 1024:]`
+- `solvent_extractor(solvent_feat)` → 256-dim
+- `fp_extractor(smiles_extra_feat)` → 512-dim (2×256 from attention + pooling)
+- Concatenate: `[graph(256) + solvent(256) + fp_extractor(512)] = 1024-dim`
+
+### Architecture 2: GraphFingerprintsModelFC (for plqy and k)
+Uses simple FC for ALL fingerprints combined (no separate solvent processing).
+
+**Layer structure (verified from state_dict):**
+```
+fp_fc.0: Linear(2192, 256)
+fp_fc.3: Linear(256, 256)
+predict.1: Linear(512, 128)  ← input is 512!
+predict.3: Linear(128, 1)
+```
+
+**Fingerprint processing:**
+- Processes ALL fingerprints together: `fp_fc(fingerprints)` → 256-dim
+- Concatenate: `[graph(256) + fp_fc(256)] = 512-dim`
+
+### Model Hyperparameters (EXACT values from 02_property_prediction.py)
+
+| Target | num_layers | num_timesteps | dropout | alpha (LDS) | Architecture |
+|--------|------------|---------------|---------|-------------|--------------|
+| **abs** | 2 | 2 | 0.3 | 0.1 | GraphFingerprintsModel |
+| **em** | 3 | 1 | 0.3 | 0.0 | GraphFingerprintsModel |
+| **plqy** | 2 | 3 | 0.4 | 0.2 | GraphFingerprintsModelFC |
+| **k** | 3 | 1 | 0.3 | 0.6 | GraphFingerprintsModelFC |
+
+### State Dict Key Differences
+
+**Model_abs.pth / Model_em.pth contain:**
+- `fp_extractor.conv_feat.*`, `fp_extractor.conv_attn.*`
+- `solvent_extractor.0.*`, `solvent_extractor.3.*`
+- `predict.1.weight` shape: `[128, 1024]`
+
+**Model_plqy.pth / Model_k.pth contain:**
+- `fp_fc.0.*`, `fp_fc.3.*` (NO fp_extractor or solvent_extractor!)
+- `predict.1.weight` shape: `[128, 512]`
+
+---
+
+## Fingerprint Structure and Order
+
+**CRITICAL: Fingerprint order matters! Must be exactly:**
+```
+[solvent_fp(1024), smiles_fp(1024), numeric_scaled(8), scaffold_flags(136)] = 2192 total
+```
+
+### Data Files
+- **Solvent fingerprints**: `train_sol_*.csv` (1024 columns) - Morgan FP radius=2, nBits=1024
+- **Molecule fingerprints**: `train_smiles_*.csv` (1024 columns) - Morgan FP radius=2, nBits=1024
+- **Extra features**: columns 8-151 of `train_*.csv` (144 columns = 8 numeric + 136 scaffold)
+
+### Column Structure in train_abs.csv (152 total columns)
+```
+Columns 0-7:   split, smiles, solvent, abs, em, plqy, k, tag_name (metadata)
+Columns 8-15:  solvent_num, tag, Molecular_Weight, LogP, TPSA, Double_Bond_Count, Ring_Count, unimol_plus (8 numeric)
+Columns 16-151: fragment_1 to fragment_136 (136 scaffold binary flags)
+```
+
+### Preprocessing Steps
+1. **Numeric features** (columns 8:16): Apply `MinMaxScaler` fit on training data
+2. **Scaffold flags** (columns 16:152): Use as-is (binary 0/1)
+3. **Concatenate**: `[solvent_fp, smiles_fp, numeric_scaled, scaffold_flags]`
+4. **Labels**: Apply `StandardScaler` fit on training data, inverse transform predictions
+
+---
+
+## Model Class Definitions (for training/inference)
+
+### FingerprintAttentionCNN (used by abs/em)
+```python
+class FingerprintAttentionCNN(nn.Module):
+    def __init__(self, input_dim, conv_channels=256):
+        super().__init__()
+        self.conv_feat = nn.Conv1d(1, conv_channels, kernel_size=3, padding=1)
+        self.conv_attn = nn.Conv1d(1, conv_channels, kernel_size=3, padding=1)
+        self.softmax = nn.Softmax(dim=-1)
+        self.pool = nn.AdaptiveMaxPool1d(1)
+
+    def forward(self, x):
+        x = x.unsqueeze(1)  # [B, 1, D]
+        feat_map = self.conv_feat(x)
+        attn_map = self.conv_attn(x)
+        attn_weights = self.softmax(attn_map)
+        attn_out = torch.sum(feat_map * attn_weights, dim=-1)  # [B, C]
+        pooled = self.pool(feat_map).squeeze(-1)               # [B, C]
+        return torch.cat([attn_out, pooled], dim=1)            # [B, 2C]
+```
+
+### GraphFingerprintsModel (for abs/em)
+```python
+class GraphFingerprintsModel(nn.Module):
+    def __init__(self, node_feat_size, edge_feat_size, solvent_dim, smiles_extra_dim,
+                 graph_feat_size=256, num_layers=2, num_timesteps=2, n_tasks=1, dropout=0.3):
+        super().__init__()
+        self.solvent_dim = solvent_dim  # Must store for forward pass!
+        self.gnn = AttentiveFPGNN(...)
+        self.readout = AttentiveFPReadout(...)
+        self.fp_extractor = FingerprintAttentionCNN(smiles_extra_dim, conv_channels=graph_feat_size)
+        self.solvent_extractor = nn.Sequential(
+            nn.Linear(solvent_dim, 256), nn.ReLU(), nn.Dropout(dropout),
+            nn.Linear(256, graph_feat_size)
+        )
+        self.predict = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(graph_feat_size * 4, 128),  # 256+256+512=1024
+            nn.ReLU(),
+            nn.Linear(128, n_tasks)
+        )
+```
+
+### GraphFingerprintsModelFC (for plqy/k)
+```python
+class GraphFingerprintsModelFC(nn.Module):
+    def __init__(self, node_feat_size, edge_feat_size, fp_size,
+                 graph_feat_size=256, num_layers=2, num_timesteps=2, n_tasks=1, dropout=0.3):
+        super().__init__()
+        self.gnn = AttentiveFPGNN(...)
+        self.readout = AttentiveFPReadout(...)
+        self.fp_fc = nn.Sequential(
+            nn.Linear(fp_size, 256), nn.ReLU(), nn.Dropout(dropout),
+            nn.Linear(256, graph_feat_size)
+        )  # Only 4 layers! indices 0,1,2,3
+        self.predict = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(graph_feat_size * 2, 128),  # 256+256=512
+            nn.ReLU(),
+            nn.Linear(128, n_tasks)
+        )
+```
+
+---
 
 ## Training Data
 
 ### Fluor-RLAT (Property Prediction)
 - **Primary source**: 00_FluoDB.csv (49,832 total records)
-  - Columns: abs, em, plqy, k (log-transformed), smiles, solvent, solvent_num, tag, tag_name, Molecular_Weight, LogP, TPSA, Avg_Gasteiger_Charge, Double_Bond_Count, Ring_Count, unimol_plus, split
-  - Split into train (21,949), valid (~5,000), test (~5,000) across four properties (abs/em/plqy/k)
-- **Features** (total 152 columns per sample in train_abs.csv, etc.):
-  1. **Target labels** (1 column): abs (nm), em (nm), plqy (0-1), or k (log₁₀ molar absorptivity)
-  2. **Molecular descriptors** (8 columns): Molecular_Weight, LogP, TPSA, Double_Bond_Count, Ring_Count, unimol_plus, tag (scaffold numeric ID), solvent_num (mapped from solvent SMILES)
-  3. **Scaffold fingerprints** (136 columns, fragment_1..fragment_136): binary indicators for 136 predefined substructures (from 00_mmp_substructure.csv) including SquaricAid, Naphthalimide, Coumarin, BODIPY, Cyanine, Rhodamine, etc.
-  4. **Solvent fingerprints** (2048-bit Morgan, stored in train_sol_abs.csv): radius=2 Morgan fingerprint of solvent SMILES (mapped via 00_solvent_mapping.csv: 75 solvents including ClCCl, CO, CCO, CC#N, etc.)
-  5. **Molecule fingerprints** (2048-bit Morgan, stored in train_smiles_abs.csv): radius=2 Morgan fingerprint of target molecule SMILES
-- **Preprocessing** (01_data_preprocessing.py):
-  - Maps solvent names → solvent_num (0-74) via 00_solvent_mapping.csv
-  - Computes RDKit descriptors: MW, logP, TPSA, count_double_bonds (includes aromatics), ring count
-  - Assigns scaffold tags from 136-member substructure dictionary (binary match to fragment_1..fragment_136)
-  - Generates Morgan fingerprints (radius=2, nBits=2048) for both solvent and molecule SMILES
-- **Targets**:
-  - abs: absorption wavelength in nm (range ~300-900)
-  - em: emission wavelength in nm (range ~350-1000)
-  - plqy: photoluminescence quantum yield (0-1 scale)
-  - k: log₁₀(molar absorptivity) (range ~3-5.5)
+- **Split**: train (~22k), valid (~5k), test (~5k) per property
+- **Features per sample**: 152 columns in train_abs.csv + 1024 solvent FP + 1024 molecule FP = 2192 total fingerprint dims
 
-### NIRFluor-opt (NIR Classification)
-- **Training data**: Morgan_train_set.csv (13,792 samples)
-  - Columns: smiles, abs (nm), label (0=non-NIR, 1=NIR), Bit_1..Bit_2048 (Morgan fingerprint)
-  - Binary classification: label=1 indicates near-infrared fluorophore (typically abs >650 nm)
-  - Features: 2048-bit Morgan fingerprint (radius=2) derived from SMILES
-- **Transformation rules**: transformation_rules.csv (10,355 rules)
-  - Columns: element_tran (transformation description), public (example SMILES with markers [*:*]), public_num (example with markers [*:1], [*:2], etc.)
-  - Rules sourced from literature MMP (matched molecular pair) transformations
-  - MACCS and Morgan fingerprints precomputed for similarity filtering (transformation_rules_maccs.csv, transformation_rules_morgan.csv)
-- **No retraining scripts**: Both NIR classifier (stacking_model_full.pkl) and property models (Model_abs.pth, etc.) are **pretrained only**; no training code exists in repository
+### Data Files Per Target
+```
+train_{target}.csv      - main data with labels and descriptors (152 cols)
+train_sol_{target}.csv  - solvent Morgan fingerprints (1024 cols)
+train_smiles_{target}.csv - molecule Morgan fingerprints (1024 cols)
+valid_*.csv, test_*.csv  - same structure
+```
 
-## Model Architecture
+### Targets and Ranges
+- **abs**: absorption wavelength (nm), range ~300-900
+- **em**: emission wavelength (nm), range ~350-1000
+- **plqy**: quantum yield, range 0.0-1.0
+- **k**: log₁₀(molar absorptivity), range ~3.0-5.5
 
-### Fluor-RLAT Property Prediction (GraphFingerprintsModel)
-**Multimodal deep learning** combining graph neural networks with fingerprint CNNs:
-- **Graph branch** (AttentiveFPGNN + AttentiveFPReadout):
-  - Input: molecular graph with atom features (39-dim) and bond features (10-dim) from AttentiveFP featurizers
-  - Architecture: num_layers=2 (abs), 3 (em/k), 1 (plqy); graph_feat_size=256; dropout=0.3
-  - Output: 256-dim graph-level embedding
-- **Fingerprint branches** (parallel processing):
-  1. **Solvent extractor** (FC network): solvent Morgan fingerprint (2048-bit) → 256-dim via 2-layer MLP
-  2. **Molecule+descriptor extractor** (FingerprintAttentionCNN): concatenated [molecule Morgan (2048-bit) + 8 numeric descriptors + 136 scaffold flags] → 512-dim (2×256) via Conv1d attention mechanism
-- **Feature fusion**: concatenate [graph_feats (256) + solvent_out (256) + smiles_extra_out (512)] → 1024-dim
-- **Prediction head**: 1024 → 128 (ReLU) → 1 (final property value)
-- **Training details** (inferred from code, no training script):
-  - Loss: MSE with LDS (Label Distribution Smoothing) reweighting via KernelDensity (bandwidth=5, alpha=0.1 for abs, 0 for others)
-  - Optimizer: Adam, lr=1e-3
-  - Epochs: 3 (for validation), patience=20 (early stopping)
-  - Batch size: 32
-  - Normalization: StandardScaler for labels (abs/em/plqy/k), MinMaxScaler for 8 numeric descriptors
-- **Four separate models**: Model_abs.pth, Model_em.pth, Model_plqy.pth, Model_k.pth (each ~10-50MB .pth files containing state_dict)
+---
 
-### NIRFluor-opt NIR Classification (Stacking Ensemble)
-**Stacking classifier** trained on Morgan fingerprints:
-- **Input**: 2048-bit Morgan fingerprint (radius=2) from SMILES
-- **Architecture**: StackingClassifier with multiple base learners (GradientBoosting, LogisticRegression, LightGBM, XGBoost) + meta-learner
-- **Output**: binary label (0/1) + probability score for NIR class
-- **Model file**: stacking_model_full.pkl (pickled with scikit-learn 1.0.2)
-- **Critical constraint**: requires scikit-learn==1.0.2 (1.7+ breaks sklearn.ensemble._gb_losses import)
-- **No retraining**: model is pretrained; code only loads and runs inference via joblib.load + predict_proba/predict
+## Colab Training Notebook
 
-## Model Differences: Fluor-RLAT vs NIRFluor-opt
-| Aspect | Fluor-RLAT (Property Prediction) | NIRFluor-opt (NIR Classification) |
-|--------|----------------------------------|-----------------------------------|
-| **Task** | Regression (4 properties: abs/em/plqy/k) | Binary classification (NIR yes/no) |
-| **Input** | SMILES + solvent (mapped to ID) | SMILES only |
-| **Model type** | Deep learning (GNN + CNN fusion) | Classical ML (stacking ensemble) |
-| **Features** | Graph + Morgan FP + descriptors + scaffold flags + solvent FP | Morgan FP (2048-bit) only |
-| **Training data** | 00_FluoDB.csv (49,832 records) | Morgan_train_set.csv (13,792 records) |
-| **Data overlap** | Some shared molecules, different targets | Independent NIR label annotation |
-| **Output** | Four continuous values (wavelengths/yield/extinction) | Binary label + probability |
-| **Model files** | Model_abs.pth (25MB), Model_em.pth, Model_plqy.pth, Model_k.pth | stacking_model_full.pkl (10MB) |
-| **Framework** | PyTorch + DGL + dgllife | scikit-learn + lightgbm + xgboost |
-| **Inference** | 02_property_prediction.py (loads .pth, runs forward pass) | processing.py (joblib.load, predict_proba) |
-| **Retraining** | No training script (pretrained only) | No training script (pretrained only) |
+**Location**: `colab_training/Fluor_RLAT_Training.ipynb`
 
-## Environment Setup Issues
-- Python 3.7-3.10 recommended; critical version constraint: scikit-learn==1.0.2 (stacking model pickled with this version; 1.7+ breaks internal imports like sklearn.ensemble._gb_losses)
-- Required deps: RDKit, DGL (1.1.2+cu117), dgllife (0.2.8), PyTorch (1.13.1), pandas (1.3.0), lightgbm, xgboost, scikit-learn==1.0.2
-- Install order matters: install PyTorch with CUDA first if GPU available, then dgl matching CUDA version, then dgllife
-- Common missing deps during first run: lightgbm, xgboost (needed by stacking model in processing.py)
-- GPU optional but recommended for 02_性质预测.py; falls back to CPU automatically
-- MorganGenerator deprecation warnings from RDKit are harmless (old API still functional)
-## Training / Retraining
-**No training scripts exist in this repository**—all models are pretrained only:
-- **Fluor-RLAT models** (Model_abs.pth, Model_em.pth, Model_plqy.pth, Model_k.pth): PyTorch state_dicts saved after training; no training code provided
-  - 02_property_prediction.py contains inference-only pipeline: loads pretrained models via `model.load_state_dict(torch.load('Model_*.pth'))`, runs forward pass, inverse-transforms predictions
-  - To retrain: would need to implement training loop with MSE+LDS loss, Adam optimizer (lr=1e-3), early stopping (patience=20), data loaders for train/valid sets
-  - Training data available in data/train_*.csv, data/valid_*.csv, data/test_*.csv (split already performed in 00_FluoDB.csv)
-- **NIR classifier** (stacking_model_full.pkl): pickled scikit-learn StackingClassifier; no training code provided
-  - processing.py loads via `joblib.load('./data/stacking_model_full.pkl')` for inference only
-  - To retrain: would need to implement stacking ensemble with base learners (GradientBoosting, LogisticRegression, LightGBM, XGBoost), fit on Morgan_train_set.csv, pickle with scikit-learn==1.0.2
-  - **Critical**: must use scikit-learn==1.0.2 for pickle compatibility; retrain would require same version
-- **Retraining not required for normal usage**: existing models cover intended use cases (property prediction and NIR classification)
-- **If retraining needed**: refer to 02_property_prediction.py model architecture (GraphFingerprintsModel class) for Fluor-RLAT; no reference architecture exists for NIR stacking model beyond inference calls in processing.py
+### Features
+- GPU-accelerated training with CUDA support
+- Checkpoint saving/resumption (survives Colab disconnects)
+- Automatic early stopping (patience=20)
+- LDS (Label Distribution Smoothing) for imbalanced data
+- tqdm progress bars
+- Comparison cell for pretrained vs newly trained models
 
-### Adding New Training Data for Fluor-RLAT
+### Key Configuration
+```python
+# Optimizer: AdamW (weight_decay=5e-5) — decoupled L2 regularization
+# Gradient clipping: max_norm=5.0
+# LR scheduler: CosineAnnealingWarmRestarts (T_0=20, T_mult=2, eta_min=1e-6)
 
-**Data format required**: To add new training data, you need at minimum:
-- `smiles`: molecular SMILES string
-- `solvent`: solvent name (must match one of 75 entries in data/00_solvent_mapping.csv: ClCCl, CO, CCO, CC#N, Cc1ccccc1, CS(C)=O, etc.)
-- `abs`: absorption wavelength in nm (optional if only training emission model)
-- `em`: emission wavelength in nm (optional if only training absorption model)
-- `plqy`: quantum yield 0-1 (optional, leave empty/NaN if not available)
-- `k`: molar absorptivity (optional, leave empty/NaN if not available)
+MODEL_CONFIGS = {
+    'abs':  {'num_layers': 2, 'num_timesteps': 2, 'dropout': 0.3, 'alpha': 0.1, 'model_class': 'GraphFingerprintsModel'},
+    'em':   {'num_layers': 3, 'num_timesteps': 1, 'dropout': 0.3, 'alpha': 0.0, 'model_class': 'GraphFingerprintsModel'},
+    'plqy': {'num_layers': 2, 'num_timesteps': 3, 'dropout': 0.4, 'alpha': 0.2, 'model_class': 'GraphFingerprintsModelFC'},
+    'k':    {'num_layers': 3, 'num_timesteps': 1, 'dropout': 0.3, 'alpha': 0.6, 'model_class': 'GraphFingerprintsModelFC'},
+}
+```
 
-**Where to put new data**:
-1. **Option 1 - Concatenate to existing dataset** (recommended for large additions >5k samples):
-   - Add rows to Fluor-RLAT/data/00_FluoDB.csv
-   - Required columns: `abs,em,plqy,k,smiles,solvent,solvent_num,tag,tag_name,Molecular_Weight,LogP,TPSA,Avg_Gasteiger_Charge,Double_Bond_Count,Ring_Count,unimol_plus,split`
-   - Fill missing columns by running 01_data_preprocessing.py or compute manually:
-     - `solvent_num`: map via 00_solvent_mapping.csv (0-74)
-     - `tag`, `tag_name`: scaffold assignment (computed by preprocessing)
-     - `Molecular_Weight`, `LogP`, `TPSA`, `Double_Bond_Count`, `Ring_Count`: RDKit descriptors
-     - `split`: assign 'train', 'valid', or 'test' (stratify by solvent/scaffold if possible)
-   - After adding data, re-run preprocessing to regenerate train/valid/test splits and fingerprint files
+### Expected Predictions (test molecule: BODIPY in toluene)
+```
+SMILES: C2=C1C7=C(C(=[N+]1[B-]([N]3C2=C5C(=C3C4=CC=CC=C4)C=CC=C5)(F)F)C6=CC=CC=C6)C=CC=C7
+Solvent: CC1=CC=CC=C1 (toluene)
 
-2. **Option 2 - Simple format (RECOMMENDED if you only have smiles + solvent + abs/em)**:
-   - Create CSV with just 4 columns: `smiles,solvent,abs,em`
-   - Leave `plqy` and `k` empty/omitted (models train separately)
-   - Place file as Fluor-RLAT/input/target.csv or create your own filename
-   - Run 01_data_preprocessing.py to automatically compute:
-     - RDKit descriptors (MW, LogP, TPSA, double bonds, rings)
-     - Scaffold tags (binary match against 136 substructures)
-     - Morgan fingerprints (2048-bit for both molecule and solvent)
-     - All 152 feature columns
-   - Manually split output into train/valid/test CSVs (e.g., 70/15/15 split)
-   - Train Model_abs.pth and Model_em.pth (skip plqy and k models)
+Expected results:
+- Absorption: ~639.89 nm
+- Emission: ~660.38 nm
+- Quantum Yield: ~0.76
+- Log ε: ~5.0
+```
 
-3. **Option 3 - Separate training dataset** (for advanced users):
-   - Create new CSV with columns: `smiles,solvent,abs,em,plqy,k`
-   - Run through 01_data_preprocessing.py to generate descriptors and fingerprints
-   - Manually split into train/valid/test CSVs
-   - Either train standalone model or fine-tune pretrained weights
+---
 
-**Training script requirements** (not included in repo—must implement):
-- Data loaders using MolecularDataset class and collate_fn from 02_property_prediction.py
-- Training loop with:
-  - Forward pass: `predictions = model(graphs, node_feats, edge_feats, fps)`
-  - Loss: MSE with optional LDS reweighting `(weights * (predictions - labels)**2).mean()`
-  - Optimizer: Adam(lr=1e-3)
-  - Early stopping: patience=20 epochs, save best validation loss
-  - Checkpoint: `torch.save(model.state_dict(), 'Model_abs.pth')` when validation improves
-- Normalization: fit StandardScaler on training labels, MinMaxScaler on 8 numeric descriptors (columns 8-16 in feature matrix)
-- Batch size: 32, epochs: typically 50-100 with early stopping
+## Common Pitfalls and Bugs
 
-**Solvent constraints**:
-- New solvents not in 00_solvent_mapping.csv require:
-  - Adding solvent SMILES and assigning new solvent_num
-  - Generating 2048-bit Morgan fingerprint for the solvent
-  - Retraining on sufficient data covering new solvent (models won't extrapolate well to unseen solvents)
+### 1. Wrong Model Architecture Selection
+**Bug**: Using GraphFingerprintsModel for plqy/k or vice versa
+**Symptom**: State dict loading fails with mismatched keys
+**Fix**: Check `model_class` in config, use correct class
 
-**Data volume recommendations**:
-- Full retrain: >10k samples for good generalization
-- Fine-tuning pretrained models: >1k samples, use low learning rate (1e-4 to 1e-5)
-- Transfer learning: <1k samples, freeze graph branch, only train fingerprint extractors
+### 2. Wrong Fingerprint Order
+**Bug**: `[smiles_fp, solvent_fp, extra]` instead of `[solvent_fp, smiles_fp, extra]`
+**Symptom**: Predictions are wildly wrong (1000+ nm absorption)
+**Fix**: Always use order: `[solvent(1024), smiles(1024), numeric(8), scaffold(136)]`
 
-## Operational Notes
-- processing.py assumes rule CSV schemas: columns include element_tran, node1, node2, smiles fingerprints; similarity threshold drives rule selection
-- SMILES/solvent validation is minimal; invalid SMILES will raise RuntimeError during fragmentation or model loading
-- All Chinese filenames and content have been translated to English (Feb 2026); use ASCII names for new files
-- Scripts modified to work from their own directories (pathlib anchoring); all ./predict/ paths converted to ./ in predict/ folder scripts
+### 3. Missing MinMaxScaler on Numeric Features
+**Bug**: Using raw numeric features without scaling
+**Symptom**: Predictions are wrong
+**Fix**: Fit MinMaxScaler on train_df.iloc[:, 8:16], transform inference data
 
-## Editing Guidelines
-- Keep paths relative to their module roots (do not hardcode absolute paths).
-- Avoid altering rule CSV schemas or model filenames unless you also update processing.py and prediction scripts accordingly.
-- When extending web UI, preserve Flask route behaviors and expected CSV outputs for templates.
-- For batch jobs, consider bypassing Flask and calling processing.process or Fluor-RLAT scripts directly; capture outputs before cleanup steps delete intermediates.
-- Add brief comments only where logic is non-obvious (e.g., feature splits, rule expansion), stay concise.
+### 4. Missing StandardScaler Inverse Transform
+**Bug**: Returning raw model output without inverse transform
+**Symptom**: Predictions are normalized values near 0
+**Fix**: `label_scaler.inverse_transform([[raw_pred]])[0, 0]`
+
+### 5. fp_fc Layer Count Mismatch (plqy/k models)
+**Bug**: Defining fp_fc with 6 layers instead of 4
+**Symptom**: State dict keys don't match (fp_fc.4, fp_fc.5 not found)
+**Fix**: fp_fc should be: `Linear→ReLU→Dropout→Linear` (indices 0,1,2,3 only)
+
+### 6. Wrong predict Layer Input Dimension
+**Bug**: Using 1024 input for plqy/k predict layer
+**Symptom**: Size mismatch error
+**Fix**: abs/em use 1024 (graph+solvent+fp_extractor), plqy/k use 512 (graph+fp_fc)
+
+---
+
+## Detailed Pipeline & Normalization
+
+### Property Prediction Pipeline (Fluor-RLAT) - Step by Step
+
+#### Step 1: Preprocessing (`01_data_preprocessing.py`)
+
+**Input**: `input/target.csv` with columns `smiles, solvent`
+
+**Operations**:
+1. **Solvent Mapping**: Maps solvent SMILES → integer `solvent_num` using `data/00_solvent_mapping.csv`
+2. **RDKit Descriptors**: Computes 6 molecular descriptors:
+   - `Molecular_Weight`: `Descriptors.MolWt(mol)`
+   - `LogP`: `Descriptors.MolLogP(mol)`
+   - `TPSA`: `Descriptors.TPSA(mol)`
+   - `Double_Bond_Count`: count of double + aromatic bonds via RDKit `sum(1 for bond in mol.GetBonds() if bond.GetBondType() == DOUBLE or bond.GetIsAromatic())`
+   - `Ring_Count`: `mol.GetRingInfo().NumRings()`
+   - `unimol_plus`: placeholder (set to 0)
+3. **Scaffold Tags**: Checks 136 substructures from `data/00_mmp_substructure.csv`, creates binary flags `fragment_1..fragment_136`
+4. **Morgan Fingerprints**: Generates 1024-bit fingerprints for both molecule and solvent:
+   ```python
+   AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=1024)
+   ```
+
+**Outputs**:
+- `input/input.csv` - 152 columns (metadata + 8 numeric + 136 scaffold)
+- `input/target_smiles_morgan.csv` - 1024 molecule fingerprint columns
+- `input/target_sol_morgan.csv` - 1024 solvent fingerprint columns
+
+#### Step 2: Inference (`02_property_prediction.py`)
+
+**For each target (abs, em, plqy, k):**
+
+1. **Load Training Data** (for scaler fitting):
+   ```python
+   train_df = pd.read_csv(f'data/train_{target}.csv')
+   train_sol = pd.read_csv(f'data/train_sol_{target}.csv')
+   train_smiles = pd.read_csv(f'data/train_smiles_{target}.csv')
+   ```
+
+2. **Fit Feature Scaler** (MinMaxScaler on numeric features only):
+   ```python
+   feature_scaler = MinMaxScaler()
+   feature_scaler.fit(train_df.iloc[:, 8:16])  # 8 numeric columns
+   ```
+
+3. **Fit Label Scaler** (StandardScaler on target values):
+   ```python
+   label_scaler = StandardScaler()
+   label_scaler.fit(train_df[[target]].values)
+   ```
+
+4. **Prepare Input Features**:
+   ```python
+   # Scale numeric features (columns 8:16)
+   numeric_scaled = feature_scaler.transform(input_df.iloc[:, 8:16])
+   
+   # Scaffold flags (columns 16:152) - no scaling, use as-is
+   scaffold = input_df.iloc[:, 16:152].values
+   
+   # Concatenate in EXACT order:
+   fingerprints = np.hstack([
+       solvent_fp,      # 1024 columns from target_sol_morgan.csv
+       smiles_fp,       # 1024 columns from target_smiles_morgan.csv  
+       numeric_scaled,  # 8 columns, MinMaxScaled
+       scaffold         # 136 columns, binary 0/1
+   ])  # Total: 2192 dimensions
+   ```
+
+5. **Build DGL Graph** (for GNN component):
+   ```python
+   from dgllife.utils import smiles_to_bigraph, CanonicalAtomFeaturizer, CanonicalBondFeaturizer
+   
+   graph = smiles_to_bigraph(
+       smiles,
+       node_featurizer=CanonicalAtomFeaturizer(),  # 39 features per atom
+       edge_featurizer=CanonicalBondFeaturizer()   # 10 features per bond
+   )
+   ```
+
+6. **Model Forward Pass**:
+   ```python
+   # For abs/em (GraphFingerprintsModel):
+   #   - Splits fingerprints: solvent[:1024] vs rest[1024:]
+   #   - Processes separately, concatenates to 1024-dim
+   
+   # For plqy/k (GraphFingerprintsModelFC):
+   #   - Processes all 2192 fingerprints together
+   #   - Concatenates to 512-dim
+   
+   raw_prediction = model(graph, fingerprints)
+   ```
+
+7. **Inverse Transform** (convert normalized output back to real units):
+   ```python
+   final_prediction = label_scaler.inverse_transform([[raw_prediction]])[0, 0]
+   ```
+
+#### Step 3: Merge (`03_file_merge.py`)
+
+Concatenates `target_predictions_abs.csv`, `target_predictions_em.csv`, etc. into single `target_predictions.csv` and cleans up `.bin` cache files.
+
+---
+
+### Normalization Details
+
+#### Feature Normalization (MinMaxScaler)
+
+**Applied to**: 8 numeric descriptor columns (indices 8:16)
+**NOT applied to**: Fingerprints (binary 0/1) or scaffold flags (binary 0/1)
+
+```python
+# Columns 8-15 in train_*.csv:
+# solvent_num, tag, Molecular_Weight, LogP, TPSA, Double_Bond_Count, Ring_Count, unimol_plus
+
+feature_scaler = MinMaxScaler()
+feature_scaler.fit(train_df.iloc[:, 8:16])  # Fit on TRAINING data only!
+
+# Transform both train and inference data
+train_numeric_scaled = feature_scaler.transform(train_df.iloc[:, 8:16])
+input_numeric_scaled = feature_scaler.transform(input_df.iloc[:, 8:16])
+```
+
+**Why MinMaxScaler?** Scales values to [0, 1] range, preserving relative differences. Good for neural networks because it keeps gradients stable.
+
+#### Label Normalization (StandardScaler)
+
+**Applied to**: Target property values (abs, em, plqy, k)
+**Purpose**: Neural network outputs are trained on normalized labels for stable training
+
+```python
+label_scaler = StandardScaler()
+label_scaler.fit(train_df[[target]].values)  # Fit on TRAINING data only!
+
+# During training: normalize labels
+y_train_normalized = label_scaler.transform(train_df[[target]].values)
+
+# During inference: inverse transform predictions
+raw_output = model(graph, fingerprints)  # Returns normalized value
+final_prediction = label_scaler.inverse_transform([[raw_output]])[0, 0]
+```
+
+**Why StandardScaler?** Converts to zero-mean, unit-variance distribution. Essential because:
+- Different targets have vastly different ranges (abs: 300-900 nm vs plqy: 0-1)
+- Training loss converges better with normalized targets
+- **CRITICAL**: Must inverse transform predictions to get real units!
+
+#### What Gets Normalized vs Not
+
+| Component | Normalization | Reason |
+|-----------|---------------|--------|
+| Solvent fingerprints (1024) | None | Binary 0/1, already normalized |
+| Molecule fingerprints (1024) | None | Binary 0/1, already normalized |
+| Numeric descriptors (8) | MinMaxScaler | Continuous values, different scales |
+| Scaffold flags (136) | None | Binary 0/1, already normalized |
+| Target labels | StandardScaler | Continuous, vastly different scales |
+
+---
+
+### NIR Optimization Pipeline (NIRFluor-opt) - Step by Step
+
+#### Step 1: Fragment Input Molecule
+```python
+from rdkit.Chem import rdMMPA
+
+# Cut molecule at 1, 2, and 3 bonds
+for cut_count in [1, 2, 3]:
+    fragments = rdMMPA.FragmentMol(mol, maxCuts=cut_count, ...)
+```
+
+#### Step 2: Filter Transformation Rules by Similarity
+```python
+# Load rules from data/transformation_rules_maccs.csv
+# Each rule has: from_smiles, to_smiles, maccs_fingerprint
+
+# Calculate MACCS similarity between input and rules
+input_maccs = MACCSkeys.GenMACCSKeys(mol)
+for rule in rules:
+    similarity = DataStructs.TanimotoSimilarity(input_maccs, rule.maccs)
+    if similarity > threshold:
+        applicable_rules.append(rule)
+```
+
+#### Step 3: Apply Substitutions
+```python
+# Replace fragments with transformation rule outputs
+new_molecules = []
+for rule in applicable_rules:
+    new_mol = apply_substitution(input_mol, rule)
+    new_molecules.append(new_mol)
+```
+
+#### Step 4: NIR Classification
+```python
+# Generate 2048-bit Morgan fingerprint
+fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048)
+
+# Load stacking classifier (REQUIRES scikit-learn==1.0.2!)
+model = joblib.load('stacking_model_full.pkl')
+
+# Predict: 1 = NIR dye candidate, 0 = not NIR
+predicted_label = model.predict([fp])[0]
+probability = model.predict_proba([fp])[0, 1]
+```
+
+#### Step 5: Output
+- `results/new_molecules.csv` with `predicted_label` column
+- Only molecules with `predicted_label == 1` are NIR candidates
+
+---
+
+## Environment Setup
+
+### Critical Version Constraints
+- **scikit-learn==1.0.2** (stacking model pickled with this version; 1.7+ breaks imports)
+- Python 3.7-3.10 recommended
+- PyTorch 1.13.1+ with CUDA (optional but recommended)
+- DGL 1.1.2+cu117, dgllife 0.2.8
+
+### Required Dependencies
+```
+torch, dgl, dgllife, rdkit, pandas, numpy, scikit-learn==1.0.2, lightgbm, xgboost, tqdm
+```
+
+### Install Order
+1. PyTorch with CUDA (if GPU available)
+2. DGL matching CUDA version
+3. dgllife
+4. Other deps
+
+---
+
+## FLAME Package (Upstream Dependency — Unavailable)
+
+The preprocessing scripts (`01_data_preprocessing.py`) contain a `try: from FLAME.flsf.scaffold import scaffold` import wrapped in a `try/except ImportError` block. This always falls through to the hardcoded fallback dictionary.
+
+**What FLAME is**: "FLuorophore design Acceleration ModulE" — a modular AI framework for fluorophore design from Zhu, Y. et al. (2025), *Nature Communications*, 16, 3598. **FLSF** ("FLuorescence prediction with FluoroScaFfold-driven model") is its sub-module for scaffold-based fingerprints.
+
+**What `scaffold` contains**: A Python dictionary mapping 16 fluorescent scaffold class names (`'SquaricAcid'`, `'Coumarin'`, `'BODIPY'`, `'Cyanine'`, etc.) to lists of SMILES substructure patterns. These are used for RDKit substructure matching to produce the 136 binary `fragment_1..fragment_136` columns.
+
+**Why it can't be installed**: The source code was never publicly released — not on PyPI, not on GitHub. The Zenodo deposit for the paper only contains model weights (950 MB), not Python source. The authors' code remains internal to their research group.
+
+**What we did**: Removed the dead `try/except` import from the training notebook (`Fluor_RLAT_Training.ipynb`) and kept only the hardcoded dictionary. The standalone scripts (`Fluor-RLAT/01_data_preprocessing.py`, `predict/01_data_preprocessing.py`) still have the `try/except` wrapper for compatibility with the original authors' environment.
+
+---
+
+## NIRFluor-opt NIR Classification
+
+### Stacking Ensemble Model
+- **Input**: 2048-bit Morgan fingerprint (radius=2)
+- **Model**: StackingClassifier (GradientBoosting, LogisticRegression, LightGBM, XGBoost)
+- **Output**: binary label (0/1) + probability
+- **File**: stacking_model_full.pkl
+- **Critical**: Must use scikit-learn==1.0.2
+
+---
+
+## File Responsibilities
+
+| File | Purpose |
+|------|---------|
+| `Fluor-RLAT/run.py` | Sample driver for property prediction |
+| `Fluor-RLAT/02_property_prediction.py` | Defines models, loads weights, runs inference |
+| `NIRFluor-opt and web/processing.py` | NIR optimization pipeline |
+| `NIRFluor-opt and web/app.py` | Flask web interface |
+| `colab_training/Fluor_RLAT_Training.ipynb` | GPU training notebook |
+
+---
 
 ## Repository Change Log
-**Important**: Document significant changes here so future agents/sessions understand what was modified.
+
+### February 2026 - Training Improvements (Batch 1)
+- Replaced `optim.Adam` with `optim.AdamW` (weight_decay=5e-5) for proper L2 regularization
+- Added gradient clipping (`clip_grad_norm_`, max_norm=5.0) in `train_epoch` for training stability
+- Replaced `ReduceLROnPlateau` with `CosineAnnealingWarmRestarts` (T_0=20, T_mult=2, eta_min=1e-6)
+- Created `colab_training/Model_Improvement_Research.md` with full references and future plans
+- References: Loshchilov & Hutter (2019, AdamW), Loshchilov & Hutter (2017, SGDR), Xiong et al. (2020, AttentiveFP)
+
+### February 2026 - Training Notebook & Architecture Documentation
+- Created `colab_training/Fluor_RLAT_Training.ipynb` with full training pipeline
+- Discovered and documented TWO DIFFERENT model architectures (abs/em vs plqy/k)
+- Verified exact state_dict keys and layer shapes for all 4 models
+- Fixed fingerprint order: must be `[solvent, smiles, numeric_scaled, scaffold]`
+- Documented MinMaxScaler requirement for numeric features (columns 8:16)
+- Added comprehensive model class definitions matching pretrained weights
 
 ### February 2026 - Initial Setup & Cleanup
-- Fixed path resolution issues: anchored all run.py scripts to their own directories using pathlib to avoid cwd errors when launched from different locations or debuggers
-- Padded fragment processing in processing.py to handle molecules with fewer than 4 parts (previously crashed on column count mismatch)
-- Fixed predict/ folder scripts: converted all `./predict/` paths to `./` so they run correctly when cwd is the predict directory
-- Environment version constraints documented: scikit-learn==1.0.2 required for stacking model compatibility
-- Comprehensive translation pass: renamed all Chinese filenames and translated all Chinese content to English
-  - Files renamed: `打包.ipynb` → `packaging.ipynb`, `基团替换.csv` → `group_replacement.csv`, `H替换.csv` → `H_replacement.csv`, etc.
-  - Script names: `01_数据预处理.py` → `01_data_preprocessing.py`, `02_性质预测.py` → `02_property_prediction.py`, `03_文件组合.py` → `03_file_merge.py`
-  - All print statements, comments, and error messages translated
-- Created translate_all.py for reproducible translation if needed again
-- Add brief comments only where logic is non-obvious (e.g., feature splits, rule expansion), stay concise.
+- Fixed path resolution issues: anchored all run.py scripts to their own directories
+- Padded fragment processing in processing.py for molecules with fewer than 4 parts
+- Fixed predict/ folder scripts: converted `./predict/` paths to `./`
+- Environment version constraints documented: scikit-learn==1.0.2 required
+- Translated all Chinese filenames and content to English
+
+---
+
+## Quick Reference: Model Loading
+
+```python
+# For abs/em
+model = GraphFingerprintsModel(
+    node_feat_size=39, edge_feat_size=10,
+    solvent_dim=1024, smiles_extra_dim=1168,  # 1024+144
+    graph_feat_size=256, num_layers=2, num_timesteps=2, dropout=0.3
+)
+model.load_state_dict(torch.load('Model_abs.pth'))
+
+# For plqy/k
+model = GraphFingerprintsModelFC(
+    node_feat_size=39, edge_feat_size=10,
+    fp_size=2192,  # 1024+1024+144
+    graph_feat_size=256, num_layers=2, num_timesteps=3, dropout=0.4
+)
+model.load_state_dict(torch.load('Model_plqy.pth'))
+```

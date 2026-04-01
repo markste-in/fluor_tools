@@ -1,0 +1,45 @@
+[project]
+name = "fluor-colab-unified"
+version = "0.1.0"
+description = "Unified fluorescent molecule property prediction: testable modules for Colab notebooks"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "numpy",
+    "pandas",
+    "rdkit",
+    "torch<=2.4.1",
+    "torchdata<=0.7.1",
+    "pyyaml",
+    "pydantic",
+    "dgl",
+    "dgllife",
+    "scikit-learn",
+    "tqdm",
+    "packaging",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "hypothesis",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["colab_training/fluor_modules"]
+
+[tool.uv]
+# DGL wheels for macOS ARM64 are only available from the official DGL wheel repo,
+# not from PyPI. We override the DGL source to use the official repo.
+# DGL 2.4+ only supports up to PyTorch 2.4 (ref: https://github.com/dmlc/dgl/issues/7822)
+# The general repo.html has macOS ARM64 wheels (up to DGL 2.2.1 for cp312).
+find-links = ["https://data.dgl.ai/wheels/repo.html"]
+# Prefer find-links over the default index so DGL resolves from the DGL repo
+index-strategy = "unsafe-best-match"
+
+[tool.pytest.ini_options]
+testpaths = ["colab_training/tests"]
+pythonpath = ["colab_training"]

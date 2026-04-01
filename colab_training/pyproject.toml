@@ -1,0 +1,42 @@
+# colab_training sub-package configuration
+# This file documents the dependencies for the colab_training modules.
+# The actual uv environment is managed by the root pyproject.toml.
+#
+# DGL compatibility note (ref: https://github.com/dmlc/dgl/issues/7822):
+# DGL 2.4 only supports up to PyTorch 2.4. Pin torch<=2.4.1 and install
+# DGL from the CPU wheel URL for local testing.
+
+[project]
+name = "colab-training"
+version = "0.1.0"
+description = "Testable Python modules for the Fluor-Colab-Unified Colab notebooks"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "torch<=2.4.1",
+    "torchdata<=0.7.1",
+    "pyyaml",
+    "pydantic",
+    "dgl",
+    "dgllife",
+    "rdkit",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "hypothesis",
+]
+
+[tool.uv]
+# DGL CPU wheels (ref: https://github.com/dmlc/dgl/issues/7822)
+# The general repo.html has macOS ARM64 wheels (up to DGL 2.2.1 for cp312).
+# torchdata<=0.7.1 is needed because DGL 2.2.1 uses torchdata.datapipes.
+find-links = ["https://data.dgl.ai/wheels/repo.html"]
+index-strategy = "unsafe-best-match"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
